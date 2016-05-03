@@ -2,6 +2,8 @@ package io.github.rscarvalho.rosettatest.dao;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -9,6 +11,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.skife.jdbi.v2.DBI;
 import org.skife.jdbi.v2.Handle;
+
+import com.hubspot.rosetta.Rosetta;
 
 import io.github.rscarvalho.rosettatest.data.Filter;
 import io.github.rscarvalho.rosettatest.data.FilterValue;
@@ -24,10 +28,11 @@ public class FilterDaoTest {
   @BeforeClass
   public static void setupClass() throws Exception {
     Class.forName("org.h2.Driver");
-    dbi = new DBI("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1");
+
+    dbi = new DBI("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=FALSE");
 
     Handle createHandle = dbi.open();
-    createHandle.execute("CREATE TABLE filters(" +
+    createHandle.execute("CREATE TABLE IF NOT EXISTS filters(" +
         "id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, " +
         "name VARCHAR(255), " +
         "filterValue VARCHAR(1024)" +
@@ -58,6 +63,20 @@ public class FilterDaoTest {
   }
 
   @Test
+  public void itDoesSerializationProperly() throws IOException {
+    FilterValue<?> value = new StringValue("my value");
+    Filter filter = new Filter(0L, "filter1", value);
+
+    String filterString = Rosetta.getMapper().writeValueAsString(filter);
+    assertThat(filterString).isEqualTo("{\"id\":0,\"name\":\"filter1\",\"filterValue\":\"{\\\"@type\\\":\\\"StringValue\\\",\\\"value\\\":\\\"my value\\\"}\"}");
+
+    Filter filter1 = Rosetta.getMapper().readValue(filterString, Filter.class);
+    assertThat(filter1.getName()).isEqualTo(filter.getName());
+    assertThat(filter1.getId()).isEqualTo(filter.getId());
+    assertThat(filter1.getFilterValue()).isInstanceOf(StringValue.class);
+  }
+
+  @Test
   public void itInsertsNumberFilter() {
     FilterValue<?> value = new StringValue("my value");
     Filter filter = new Filter(0L, "filter1", value);
@@ -74,8 +93,10 @@ public class FilterDaoTest {
 
     assertThat(id).isGreaterThan(0);
 
-    Filter actualFilter = filterDao.getFilters().get(0);
+    Filter actualFilter = filterDao.getById(id);
     assertThat(actualFilter).isNotNull();
+    assertThat(actualFilter.getId()).isEqualTo(id);
+    assertThat(actualFilter.getName()).isEqualTo("filter1");
     assertThat(actualFilter.getFilterValue()).isInstanceOf(NumberValue.class);
   }
 }

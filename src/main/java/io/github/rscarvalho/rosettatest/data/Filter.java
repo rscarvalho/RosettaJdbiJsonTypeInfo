@@ -18,6 +18,10 @@ public class Filter {
     this.filterValue = filterValue;
   }
 
+  public long getId() {
+    return id;
+  }
+
   public String getName() {
     return name;
   }
