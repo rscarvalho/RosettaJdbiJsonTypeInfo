@@ -13,7 +13,9 @@ import org.skife.jdbi.v2.DBI;
 import org.skife.jdbi.v2.Handle;
 
 import com.hubspot.rosetta.Rosetta;
+import com.hubspot.rosetta.jdbi.RosettaObjectMapperOverride;
 
+import io.github.rscarvalho.rosettatest.JsonUtils;
 import io.github.rscarvalho.rosettatest.data.Filter;
 import io.github.rscarvalho.rosettatest.data.FilterValue;
 import io.github.rscarvalho.rosettatest.data.NumberValue;
@@ -87,6 +89,47 @@ public class FilterDaoTest {
 
   @Test
   public void itGetsFilterById() {
+    FilterValue<?> value = new StringValue("my value");
+    Filter filter = new Filter(0L, "filter1", value);
+    long id = filterDao.insert(filter);
+
+    assertThat(id).isGreaterThan(0);
+
+    Filter actualFilter = filterDao.getById(id);
+    assertThat(actualFilter).isNotNull();
+    assertThat(actualFilter.getId()).isEqualTo(id);
+    assertThat(actualFilter.getName()).isEqualTo("filter1");
+    assertThat(actualFilter.getFilterValue()).isInstanceOf(NumberValue.class);
+  }
+
+  @Test
+  public void itGetsFilterByIdWithOverriddenJsonMapperOnHandle() {
+    Handle newHandle = dbi.open();
+
+    new RosettaObjectMapperOverride(JsonUtils.MAPPER).override(newHandle);
+    FilterDao filterDao = newHandle.attach(FilterDao.class);
+
+    FilterValue<?> value = new StringValue("my value");
+    Filter filter = new Filter(0L, "filter1", value);
+    long id = filterDao.insert(filter);
+
+    assertThat(id).isGreaterThan(0);
+
+    Filter actualFilter = filterDao.getById(id);
+    assertThat(actualFilter).isNotNull();
+    assertThat(actualFilter.getId()).isEqualTo(id);
+    assertThat(actualFilter.getName()).isEqualTo("filter1");
+    assertThat(actualFilter.getFilterValue()).isInstanceOf(NumberValue.class);
+  }
+
+  @Test
+  public void itGetsFilterByIdWithOverriddenJsonMapperOnDBI() {
+    DBI localDbi = new DBI("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=FALSE");
+    new RosettaObjectMapperOverride(JsonUtils.MAPPER).override(localDbi);
+    Handle localHandle = localDbi.open();
+
+    FilterDao filterDao = localHandle.attach(FilterDao.class);
+
     FilterValue<?> value = new StringValue("my value");
     Filter filter = new Filter(0L, "filter1", value);
     long id = filterDao.insert(filter);
